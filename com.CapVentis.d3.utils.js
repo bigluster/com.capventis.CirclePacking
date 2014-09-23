@@ -15,53 +15,49 @@ function buildJSON(qData, cubeWidth)
 {
 	// The array will hold our parent/child values
 	var a=new Array();
+
+	// This array will hold a list of IDs that we have already added to the other array.
+	// We will use this make sure that we don't add duplicates
+	var ids=new Array();
 	
 	$.each( qData, function ( key, value ) {
 		
 		// We loop across the columns to generate keys and parent/child rows
-		for (j=1; j<cubeWidth; j++)
+		for (j=0; j<cubeWidth-1; j++)
 		{
-			var key="";
-			var parent="";
-			
-			// We create a new key combining all the columns from 0 to whatever j is.
-			for (var i=0; i<j; i++)
-			{
-				// unless we are at the last record, the separator is ~~
-				var sep=(i<j-1) ? '~~' : '';
-				// the parent separators stops at the last record -1
-				var sep2=(i<j-2) ? '~~' : '';
-				
-				var vValue=value[i].qText==='-' ? '<NULL>' : value[i].qText;
-				
-				// Add the value of this column to the key 
-				key += vValue + sep;
-				
-				// If we are not on the last record, add the value to the parent key
-				if(i<j-1)
-					parent += vValue + sep2;
-				
-			}
-			
-			// create a JSON object to hold the values 
-			var r={};
-			r.Id = key;
-			r.Parent = parent;
-			r.name = value[j-1].qText === '-' ? '<NULL>' : value[j-1].qText;
-			
-			// If j has reached the width over the cube, we can add the size value
-			// This should be the last column in the cube - the measure 
-			if(j==(cubeWidth-1))
-			{
-				if(value[cubeWidth-1].qNum === undefined)
-					// remove the ',' from a formatted string - need to think about international!
-					r.size=parseFloat(value[cubeWidth-1].qText.split(',').join(''),10);
-				else
-					r.size=value[cubeWidth-1].qNum;
-			}
+			// The combination of the column number (j) and the element number (qElemNumber) is unique
+			var key=(j) + '.' + value[j].qElemNumber;
 
-			// Add the JSON object to the array
-			a.push(r);
+			// Only bother with the rest if we haven't already processed this ID
+			if(ids.indexOf(key)==-1)
+			{
+				ids.push(key);
+
+				// If we are on column 0, the parent is '0', otherwise it is the previous column's ID
+				var parent=j==0 ? '0' : (j-1) + '.' + value[j-1].qElemNumber;
+
+				// create a JSON object to hold the values 
+				var r={};
+			
+				r.Id = key;
+				r.Parent = parent;
+				r.depth = j+1;
+				r.name = value[j].qText === '-' ? '<NULL>' : value[j].qText;
+				
+				// If j has reached the width over the cube, we can add the size value
+				// This should be the last column in the cube - the measure 
+				if(j==(cubeWidth-2))
+				{
+					if(value[cubeWidth-1].qNum === undefined)
+						// remove the ',' from a formatted string - need to think about international!
+						r.size=parseFloat(value[cubeWidth-1].qText.split(',').join(''),10);
+					else
+						r.size=value[cubeWidth-1].qNum;
+				}
+
+				// Add the JSON object to the array
+				a.push(r);
+			}
 		}
 	} );
 
@@ -98,16 +94,18 @@ function convertToJSON(array){
 
         map[obj.Id] = obj;
 
-        var parent = obj.Parent || '-';
+        var parent = obj.Parent || '0';
         if(!map[parent]){
             map[parent] = {
 				name: "flare",
+				depth: 0,
+				Id: "0",
 				children: []
             };
         }
         map[parent].children.push(obj);
     }
 
-    return map['-'];
+    return map['0'];
 }
 
